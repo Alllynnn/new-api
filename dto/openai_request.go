@@ -3,6 +3,8 @@ package dto
 import (
 	"encoding/json"
 	"fmt"
+	"mime"
+	"path/filepath"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -275,16 +277,33 @@ func (r *GeneralOpenAIRequest) ParseInput() []string {
 }
 
 type Message struct {
-	Role             string          `json:"role"`
-	Content          any             `json:"content"`
-	Name             *string         `json:"name,omitempty"`
-	Prefix           *bool           `json:"prefix,omitempty"`
-	ReasoningContent string          `json:"reasoning_content,omitempty"`
-	Reasoning        string          `json:"reasoning,omitempty"`
-	ToolCalls        json.RawMessage `json:"tool_calls,omitempty"`
-	ToolCallId       string          `json:"tool_call_id,omitempty"`
+	Role             string                     `json:"role"`
+	Content          any                        `json:"content"`
+	Name             *string                    `json:"name,omitempty"`
+	Prefix           *bool                      `json:"prefix,omitempty"`
+	ReasoningContent string                     `json:"reasoning_content,omitempty"`
+	Reasoning        string                     `json:"reasoning,omitempty"`
+	ToolCalls        json.RawMessage            `json:"tool_calls,omitempty"`
+	ToolCallId       string                     `json:"tool_call_id,omitempty"`
+	ExtraFields      map[string]json.RawMessage `json:"-"`
 	parsedContent    []MediaContent
 	//parsedStringContent *string
+}
+
+func (m *Message) UnmarshalJSON(data []byte) error {
+	type alias Message
+	var value alias
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*m = Message(value)
+	m.ExtraFields = collectExtraFields(data, "role", "content", "name", "prefix", "reasoning_content", "reasoning", "tool_calls", "tool_call_id")
+	return nil
+}
+
+func (m Message) MarshalJSON() ([]byte, error) {
+	type alias Message
+	return marshalWithExtraFields(alias(m), m.ExtraFields)
 }
 
 type MediaContent struct {
@@ -386,7 +405,11 @@ func (m *MediaContent) ToFileSource() types.FileSource {
 		if file == nil || file.FileData == "" {
 			return nil
 		}
-		return types.NewFileSourceFromData(file.FileData, "")
+		mimeType := mime.TypeByExtension(filepath.Ext(file.FileName))
+		if mimeType == "" || mimeType == "application/octet-stream" {
+			return nil
+		}
+		return types.NewFileSourceFromData(file.FileData, mimeType)
 	case ContentTypeVideoUrl:
 		video := m.GetVideoUrl()
 		if video == nil || video.Url == "" {

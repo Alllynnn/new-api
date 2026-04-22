@@ -33,22 +33,56 @@ type TextResponse struct {
 type OpenAITextResponseChoice struct {
 	Index        int `json:"index"`
 	Message      `json:"message"`
-	FinishReason string `json:"finish_reason"`
+	FinishReason string                     `json:"finish_reason"`
+	ExtraFields  map[string]json.RawMessage `json:"-"`
 }
 
 type OpenAITextResponse struct {
-	Id      string                     `json:"id"`
-	Model   string                     `json:"model"`
-	Object  string                     `json:"object"`
-	Created any                        `json:"created"`
-	Choices []OpenAITextResponseChoice `json:"choices"`
-	Error   any                        `json:"error,omitempty"`
-	Usage   `json:"usage"`
+	Id          string                     `json:"id"`
+	Model       string                     `json:"model"`
+	Object      string                     `json:"object"`
+	Created     any                        `json:"created"`
+	Choices     []OpenAITextResponseChoice `json:"choices"`
+	Error       any                        `json:"error,omitempty"`
+	Usage       `json:"usage"`
+	ExtraFields map[string]json.RawMessage `json:"-"`
 }
 
 // GetOpenAIError 从动态错误类型中提取OpenAIError结构
 func (o *OpenAITextResponse) GetOpenAIError() *types.OpenAIError {
 	return GetOpenAIError(o.Error)
+}
+
+func (o *OpenAITextResponse) UnmarshalJSON(data []byte) error {
+	type alias OpenAITextResponse
+	var value alias
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*o = OpenAITextResponse(value)
+	o.ExtraFields = collectExtraFields(data, "id", "model", "object", "created", "choices", "error", "usage")
+	return nil
+}
+
+func (o OpenAITextResponse) MarshalJSON() ([]byte, error) {
+	type alias OpenAITextResponse
+	return marshalWithExtraFields(alias(o), o.ExtraFields)
+}
+
+func (c *OpenAITextResponseChoice) UnmarshalJSON(data []byte) error {
+	type alias OpenAITextResponseChoice
+	var value alias
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = OpenAITextResponseChoice(value)
+	c.ExtraFields = collectExtraFields(data, "index", "message", "finish_reason")
+	return nil
+}
+
+func (c OpenAITextResponseChoice) MarshalJSON() ([]byte, error) {
+	type alias OpenAITextResponseChoice
+	return marshalWithExtraFields(alias(c), c.ExtraFields)
 }
 
 type OpenAIEmbeddingResponseItem struct {
@@ -85,11 +119,28 @@ type ChatCompletionsStreamResponseChoice struct {
 }
 
 type ChatCompletionsStreamResponseChoiceDelta struct {
-	Content          *string            `json:"content,omitempty"`
-	ReasoningContent *string            `json:"reasoning_content,omitempty"`
-	Reasoning        *string            `json:"reasoning,omitempty"`
-	Role             string             `json:"role,omitempty"`
-	ToolCalls        []ToolCallResponse `json:"tool_calls,omitempty"`
+	Content          *string                    `json:"content,omitempty"`
+	ReasoningContent *string                    `json:"reasoning_content,omitempty"`
+	Reasoning        *string                    `json:"reasoning,omitempty"`
+	Role             string                     `json:"role,omitempty"`
+	ToolCalls        []ToolCallResponse         `json:"tool_calls,omitempty"`
+	ExtraFields      map[string]json.RawMessage `json:"-"`
+}
+
+func (c *ChatCompletionsStreamResponseChoiceDelta) UnmarshalJSON(data []byte) error {
+	type alias ChatCompletionsStreamResponseChoiceDelta
+	var value alias
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = ChatCompletionsStreamResponseChoiceDelta(value)
+	c.ExtraFields = collectExtraFields(data, "content", "reasoning_content", "reasoning", "role", "tool_calls")
+	return nil
+}
+
+func (c ChatCompletionsStreamResponseChoiceDelta) MarshalJSON() ([]byte, error) {
+	type alias ChatCompletionsStreamResponseChoiceDelta
+	return marshalWithExtraFields(alias(c), c.ExtraFields)
 }
 
 func (c *ChatCompletionsStreamResponseChoiceDelta) SetContentString(s string) {
